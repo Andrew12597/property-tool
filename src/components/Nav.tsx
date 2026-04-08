@@ -5,6 +5,7 @@ import { Home, Calculator, MapPin, Search, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
+import Logo from './Logo'
 
 const links = [
   { href: '/', label: 'Home', icon: Home },
@@ -36,9 +37,10 @@ export default function Nav() {
       {/* ── Desktop top nav ── */}
       <nav className="hidden sm:flex bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-1 h-14 w-full">
-          <span className="font-bold text-gray-900 mr-6 text-sm tracking-wide uppercase">
-            Property Tool
-          </span>
+          <Link href="/" className="flex items-center gap-2.5 mr-6">
+            <Logo size={30} />
+            <span className="font-bold text-gray-900 text-sm tracking-wide uppercase">Property Tool</span>
+          </Link>
 
           {links.map(({ href, label, icon: Icon }) => (
             <Link
@@ -75,9 +77,10 @@ export default function Nav() {
       {/* ── Mobile top bar ── */}
       <nav className="sm:hidden bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="flex items-center justify-between px-4 h-12">
-          <span className="font-bold text-gray-900 text-sm tracking-wide uppercase">
-            Property Tool
-          </span>
+          <Link href="/" className="flex items-center gap-2">
+            <Logo size={26} />
+            <span className="font-bold text-gray-900 text-sm tracking-wide uppercase">Property Tool</span>
+          </Link>
           <button
             onClick={signOut}
             className="flex items-center gap-1.5 text-gray-500 text-sm font-medium py-2"

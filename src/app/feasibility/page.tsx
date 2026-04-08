@@ -7,7 +7,7 @@ import {
 } from '@/lib/feasibility'
 import { formatCurrencyFull, formatPercent, formatNumber, cn } from '@/lib/utils'
 import { State } from '@/lib/stamp-duty'
-import { FileText, Calculator, ToggleLeft, ToggleRight, TrendingUp, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
+import { FileText, Calculator, ToggleLeft, ToggleRight, TrendingUp, ArrowUpDown, ChevronDown, ChevronUp, Save, Check } from 'lucide-react'
 
 type Mode = 'max-buy' | 'check-deal'
 
@@ -150,6 +150,10 @@ export default function FeasibilityPage() {
   const [mbResult, setMbResult] = useState<MaxBuyResult | null>(null)
   const [cdResult, setCdResult] = useState<CheckDealResult | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveModal, setSaveModal] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [savedOk, setSavedOk] = useState(false)
 
   const setM = useCallback(<K extends keyof MaxBuyInputs>(k: K, v: MaxBuyInputs[K]) => setMb(p => ({ ...p, [k]: v })), [])
   const setC = useCallback(<K extends keyof CheckDealInputs>(k: K, v: CheckDealInputs[K]) => setCd(p => ({ ...p, [k]: v })), [])
@@ -157,6 +161,26 @@ export default function FeasibilityPage() {
   const calculate = () => {
     if (mode === 'max-buy') setMbResult(calcMaxBuyPrice(mb))
     else setCdResult(checkDeal(cd))
+  }
+
+  const saveAnalysis = async () => {
+    if (!saveName.trim() || !result) return
+    setSaveLoading(true)
+    await fetch('/api/analyses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: saveName.trim(),
+        mode,
+        inputs: mode === 'max-buy' ? mb : cd,
+        result,
+      }),
+    })
+    setSaveLoading(false)
+    setSaveModal(false)
+    setSaveName('')
+    setSavedOk(true)
+    setTimeout(() => setSavedOk(false), 3000)
   }
 
   const buildCostDisplay = (inputs: typeof mb | typeof cd) => {
@@ -264,10 +288,23 @@ export default function FeasibilityPage() {
           <p className="text-sm text-gray-400 mt-0.5">Duplex / multi-dwelling development</p>
         </div>
         {result && (
-          <button onClick={savePDF} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50">
-            <FileText size={14} />
-            {saving ? 'Saving…' : 'Export PDF'}
-          </button>
+          <div className="flex items-center gap-2">
+            {savedOk && (
+              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <Check size={13} /> Saved!
+              </span>
+            )}
+            <button
+              onClick={() => setSaveModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              <Save size={14} /> Save
+            </button>
+            <button onClick={savePDF} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50">
+              <FileText size={14} />
+              <span className="hidden sm:inline">{saving ? 'Saving…' : 'Export PDF'}</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -615,6 +652,40 @@ export default function FeasibilityPage() {
           )}
         </div>
       </div>
+
+      {/* ── Save modal ── */}
+      {saveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="font-bold text-gray-900 mb-1">Save analysis</h2>
+            <p className="text-sm text-gray-400 mb-4">Give this analysis a name so you can find it later.</p>
+            <input
+              autoFocus
+              type="text"
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveAnalysis()}
+              placeholder="e.g. 14 Smith St Parramatta"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setSaveModal(false); setSaveName('') }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveAnalysis}
+                disabled={saveLoading || !saveName.trim()}
+                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                {saveLoading ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
