@@ -33,7 +33,14 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Allow auth routes through
+  // If authenticated and hitting /login, send to home
+  if (user && pathname.startsWith('/login')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
+  }
+
+  // Allow auth routes through (login, magic link callback, password reset)
   if (pathname.startsWith('/login') || pathname.startsWith('/auth')) {
     return supabaseResponse
   }
