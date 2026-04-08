@@ -71,11 +71,14 @@ function Card({ title, children, accent }: { title: string; children: React.Reac
   )
 }
 
-function ResultRow({ label, value, sub, bold, indent }: { label: string; value: string; sub?: boolean; bold?: boolean; indent?: boolean }) {
+function ResultRow({ label, value, sub, bold, indent, formula }: { label: string; value: string; sub?: boolean; bold?: boolean; indent?: boolean; formula?: string }) {
   return (
-    <div className={cn('flex justify-between items-baseline py-1.5', !sub && 'border-b border-gray-100 last:border-0')}>
-      <span className={cn('text-sm', sub ? 'text-xs text-gray-400' : 'text-gray-600', indent && 'ml-3', bold && 'font-semibold text-gray-800')}>{label}</span>
-      <span className={cn('text-sm tabular-nums font-medium', sub ? 'text-xs text-gray-400' : 'text-gray-900', bold && 'font-bold')}>{value}</span>
+    <div className={cn('py-1.5', !sub && 'border-b border-gray-100 last:border-0')}>
+      <div className="flex justify-between items-baseline">
+        <span className={cn('text-sm', sub ? 'text-xs text-gray-400' : 'text-gray-600', indent && 'ml-3', bold && 'font-semibold text-gray-800')}>{label}</span>
+        <span className={cn('text-sm tabular-nums font-medium', sub ? 'text-xs text-gray-400' : 'text-gray-900', bold && 'font-bold')}>{value}</span>
+      </div>
+      {formula && <p className={cn('text-[11px] text-gray-400 mt-0.5 font-mono', indent && 'ml-3')}>{formula}</p>}
     </div>
   )
 }
@@ -384,35 +387,95 @@ export default function FeasibilityPage() {
               </div>
 
               {/* Revenue */}
-              <Card title="Revenue (GRV)">
-                <ResultRow label={`Sale price × ${mb.numDwellings} dwellings`} value={formatCurrencyFull(mbResult.totalGRV)} />
-                <ResultRow label="Less: selling costs" value={`(${formatCurrencyFull(mbResult.sellingCosts)})`} indent />
-                <ResultRow label="Net sales proceeds" value={formatCurrencyFull(mbResult.netSales)} bold />
+              <Card title="Revenue (GRV — Gross Realisable Value)">
+                <ResultRow
+                  label={`Sale price × ${mb.numDwellings} dwellings`}
+                  value={formatCurrencyFull(mbResult.totalGRV)}
+                  formula={`$${formatNumber(mb.salePricePerDwelling)} × ${mb.numDwellings}`}
+                />
+                <ResultRow
+                  label="Less: selling costs (agent commission)"
+                  value={`(${formatCurrencyFull(mbResult.sellingCosts)})`}
+                  indent
+                  formula={`GRV × ${formatPercent(mb.sellingFeePercent)}`}
+                />
+                <ResultRow label="Net sales proceeds" value={formatCurrencyFull(mbResult.netSales)} bold formula="GRV − selling costs" />
               </Card>
 
               {/* Costs */}
               <Card title="Development Costs">
-                <ResultRow label={`Build — ${formatNumber(mbResult.totalBuildArea)} m² @ $${formatNumber(mbResult.buildCostPerM2Effective)}/m²`} value={formatCurrencyFull(mbResult.buildCostTotal)} />
-                <ResultRow label="Soft costs (DA, demolition, legal, etc.)" value={formatCurrencyFull(mbResult.softCostsTotal)} />
-                <ResultRow label="Build interest (half-draw approx.)" value={formatCurrencyFull(mbResult.buildInterest)} />
-                <ResultRow label="Target developer profit" value={formatCurrencyFull(mbResult.targetProfit)} />
+                <ResultRow
+                  label={`Build — ${formatNumber(mbResult.totalBuildArea)} m² @ $${formatNumber(mbResult.buildCostPerM2Effective)}/m²`}
+                  value={formatCurrencyFull(mbResult.buildCostTotal)}
+                  formula={`${formatNumber(mbResult.totalBuildArea)} m² × $${formatNumber(mbResult.buildCostPerM2Effective)}/m²`}
+                />
+                <ResultRow
+                  label="Soft costs (DA, demolition, legal, contingency…)"
+                  value={formatCurrencyFull(mbResult.softCostsTotal)}
+                  formula="Sum of all soft cost inputs"
+                />
+                <ResultRow
+                  label="Build interest"
+                  value={formatCurrencyFull(mbResult.buildInterest)}
+                  formula={`Build × ${formatPercent(mb.buildFundedPercent)} bank-funded × ${formatPercent(mb.buildInterestRate)} × ${mb.buildTimeMonths} mths ÷ 12 × 0.5 (half-draw — staged drawdown avg)`}
+                />
+                <ResultRow
+                  label="Target developer profit"
+                  value={formatCurrencyFull(mbResult.targetProfit)}
+                  formula={`GRV × ${formatPercent(mb.targetMarginOnGRV)} target margin`}
+                />
               </Card>
 
               {/* Land & finance at ideal price */}
               <Card title="At the Ideal Buy Price">
-                <ResultRow label="Land purchase price" value={formatCurrencyFull(mbResult.idealBuyPrice)} bold />
-                <ResultRow label="Stamp duty" value={formatCurrencyFull(mbResult.stampDuty)} indent />
-                <ResultRow label={`Land loan (${formatPercent(mb.landLVR)} LVR)`} value={formatCurrencyFull(mbResult.landLoan)} indent />
-                <ResultRow label="Land equity deposit" value={formatCurrencyFull(mbResult.landEquityDeposit)} indent />
-                <ResultRow label="Land interest" value={formatCurrencyFull(mbResult.landInterest)} indent />
-                <ResultRow label={`Build equity gap (${formatPercent(1 - mb.buildFundedPercent)} unfunded)`} value={formatCurrencyFull(mbResult.buildEquityGap)} indent />
+                <ResultRow label="Land purchase price" value={formatCurrencyFull(mbResult.idealBuyPrice)} bold formula="Solved by stepping $500 at a time until margin target is met" />
+                <ResultRow
+                  label="Stamp duty"
+                  value={formatCurrencyFull(mbResult.stampDuty)}
+                  indent
+                  formula={`${mb.state} transfer duty on $${formatNumber(mbResult.idealBuyPrice)} — Revenue ${mb.state} rate schedule`}
+                />
+                <ResultRow
+                  label={`Land loan (${formatPercent(mb.landLVR)} LVR)`}
+                  value={formatCurrencyFull(mbResult.landLoan)}
+                  indent
+                  formula={`Land price × ${formatPercent(mb.landLVR)}`}
+                />
+                <ResultRow
+                  label="Land equity deposit (your cash)"
+                  value={formatCurrencyFull(mbResult.landEquityDeposit)}
+                  indent
+                  formula={`Land price × ${formatPercent(1 - mb.landLVR)} (the ${formatPercent(1 - mb.landLVR)} the bank won't lend)`}
+                />
+                <ResultRow
+                  label="Land interest"
+                  value={formatCurrencyFull(mbResult.landInterest)}
+                  indent
+                  formula={`Land loan × ${formatPercent(mb.landInterestRate)} × ${mb.purchaseToSaleMonths} mths ÷ 12 (interest-only, full hold period)`}
+                />
+                <ResultRow
+                  label={`Build equity gap (${formatPercent(1 - mb.buildFundedPercent)} the bank won't fund)`}
+                  value={formatCurrencyFull(mbResult.buildEquityGap)}
+                  indent
+                  formula={`Build cost × ${formatPercent(1 - mb.buildFundedPercent)} unfunded portion`}
+                />
               </Card>
 
               {/* Equity */}
-              <Card title="Equity Required" accent>
-                <ResultRow label="Total equity needed" value={formatCurrencyFull(mbResult.minEquityRequired)} bold />
-                <ResultRow label={`Per investor (÷ ${mb.numInvestors})`} value={formatCurrencyFull(mbResult.equityPerInvestor)} indent />
-                <ResultRow label="Total project cost (ex profit)" value={formatCurrencyFull(mbResult.totalProjectCost)} />
+              <Card title="Equity Required (Cash In)" accent>
+                <ResultRow label="Land equity deposit" value={formatCurrencyFull(mbResult.landEquityDeposit)} formula={`Land price × ${formatPercent(1 - mb.landLVR)}`} />
+                <ResultRow label="+ Stamp duty" value={formatCurrencyFull(mbResult.stampDuty)} formula="Included — must be paid at settlement, cannot be borrowed" indent />
+                <ResultRow label="+ Soft costs" value={formatCurrencyFull(mbResult.softCostsTotal)} formula="DA, demolition, legal, contingency, bank fees" indent />
+                <ResultRow label="+ Land interest" value={formatCurrencyFull(mbResult.landInterest)} formula="Paid from equity — no capitalisation assumed" indent />
+                <ResultRow label="+ Build interest" value={formatCurrencyFull(mbResult.buildInterest)} formula="Paid from equity — no capitalisation assumed" indent />
+                <ResultRow label="+ Build equity gap" value={formatCurrencyFull(mbResult.buildEquityGap)} formula={`Unfunded ${formatPercent(1 - mb.buildFundedPercent)} of build cost`} indent />
+                <ResultRow label="= Total equity needed" value={formatCurrencyFull(mbResult.minEquityRequired)} bold formula="Sum of all items above" />
+                <ResultRow label={`Per investor (÷ ${mb.numInvestors})`} value={formatCurrencyFull(mbResult.equityPerInvestor)} indent formula={`Total equity ÷ ${mb.numInvestors} investors`} />
+                <div className="mt-2 pt-2 border-t border-blue-200">
+                  <ResultRow label="Total project cost (all costs inc. land)" value={formatCurrencyFull(mbResult.totalProjectCost)} formula="Land + stamp duty + build + soft costs + both interest costs + selling costs" />
+                  <ResultRow label="Expected profit" value={formatCurrencyFull(mbResult.expectedProfit)} formula="GRV − total project cost" />
+                  <ResultRow label="ROI on equity" value={formatPercent(mbResult.roiOnEquity)} formula="Profit ÷ total equity required" />
+                </div>
               </Card>
             </>
           )}
@@ -454,54 +517,91 @@ export default function FeasibilityPage() {
               </div>
 
               {/* Revenue */}
-              <Card title="Revenue (GRV)">
-                <ResultRow label={`${formatCurrencyFull(cd.salePricePerDwelling)} × ${cd.numDwellings} dwellings`} value={formatCurrencyFull(cdResult.totalGRV)} />
-                <ResultRow label={`Less: selling costs (${formatPercent(cd.sellingFeePercent)})`} value={`(${formatCurrencyFull(cdResult.sellingCosts)})`} indent />
-                <ResultRow label="Net sales proceeds" value={formatCurrencyFull(cdResult.netSales)} bold />
+              <Card title="Revenue (GRV — Gross Realisable Value)">
+                <ResultRow
+                  label={`${formatCurrencyFull(cd.salePricePerDwelling)} × ${cd.numDwellings} dwellings`}
+                  value={formatCurrencyFull(cdResult.totalGRV)}
+                  formula={`$${formatNumber(cd.salePricePerDwelling)} × ${cd.numDwellings}`}
+                />
+                <ResultRow
+                  label={`Less: selling costs (agent commission)`}
+                  value={`(${formatCurrencyFull(cdResult.sellingCosts)})`}
+                  indent
+                  formula={`GRV × ${formatPercent(cd.sellingFeePercent)}`}
+                />
+                <ResultRow label="Net sales proceeds" value={formatCurrencyFull(cdResult.netSales)} bold formula="GRV − selling costs" />
               </Card>
 
               {/* Full cost waterfall */}
               <Card title="All Costs (Waterfall)">
-                <ResultRow label="Land purchase price" value={formatCurrencyFull(cd.purchasePrice)} />
-                <ResultRow label={`Stamp duty (${cd.state})`} value={formatCurrencyFull(cdResult.stampDuty)} indent />
-                <ResultRow label={`Build — ${formatNumber(cdResult.totalBuildArea)} m² @ $${formatNumber(cdResult.buildCostPerM2Effective)}/m²`} value={formatCurrencyFull(cdResult.buildCostTotal)} />
-                <ResultRow label="Soft costs (DA, demo, legal, contingency…)" value={formatCurrencyFull(cdResult.softCostsTotal)} />
-                <ResultRow label={`Land interest (${formatPercent(cd.landInterestRate)} × ${cd.purchaseToSaleMonths} mths)`} value={formatCurrencyFull(cdResult.landInterest)} indent />
-                <ResultRow label={`Build interest (${formatPercent(cd.buildInterestRate)} × ${cd.buildTimeMonths} mths, half-draw)`} value={formatCurrencyFull(cdResult.buildInterest)} indent />
-                <ResultRow label="Selling costs" value={formatCurrencyFull(cdResult.sellingCosts)} />
-                <ResultRow label="Total project cost" value={formatCurrencyFull(cdResult.totalProjectCost)} bold />
+                <ResultRow label="Land purchase price" value={formatCurrencyFull(cd.purchasePrice)} formula="Your input — the agreed land price" />
+                <ResultRow
+                  label={`Stamp duty (${cd.state} transfer duty)`}
+                  value={formatCurrencyFull(cdResult.stampDuty)}
+                  indent
+                  formula={`Revenue ${cd.state} rate schedule on $${formatNumber(cd.purchasePrice)}`}
+                />
+                <ResultRow
+                  label={`Build — ${formatNumber(cdResult.totalBuildArea)} m² @ $${formatNumber(cdResult.buildCostPerM2Effective)}/m²`}
+                  value={formatCurrencyFull(cdResult.buildCostTotal)}
+                  formula={`${formatNumber(cdResult.totalBuildArea)} m² × $${formatNumber(cdResult.buildCostPerM2Effective)}/m²`}
+                />
+                <ResultRow
+                  label="Soft costs (DA, demo, legal, contingency…)"
+                  value={formatCurrencyFull(cdResult.softCostsTotal)}
+                  formula="Sum of all soft cost inputs"
+                />
+                <ResultRow
+                  label="Land interest"
+                  value={formatCurrencyFull(cdResult.landInterest)}
+                  indent
+                  formula={`Land loan × ${formatPercent(cd.landInterestRate)} × ${cd.purchaseToSaleMonths} mths ÷ 12 (interest-only, full hold period)`}
+                />
+                <ResultRow
+                  label="Build interest"
+                  value={formatCurrencyFull(cdResult.buildInterest)}
+                  indent
+                  formula={`Build × ${formatPercent(cd.buildFundedPercent)} bank-funded × ${formatPercent(cd.buildInterestRate)} × ${cd.buildTimeMonths} mths ÷ 12 × 0.5 (half-draw — staged drawdown avg)`}
+                />
+                <ResultRow
+                  label="Selling costs"
+                  value={formatCurrencyFull(cdResult.sellingCosts)}
+                  formula={`GRV × ${formatPercent(cd.sellingFeePercent)} agent commission`}
+                />
+                <ResultRow label="Total project cost" value={formatCurrencyFull(cdResult.totalProjectCost)} bold formula="Sum of all costs above" />
               </Card>
 
               {/* Returns */}
               <Card title="Returns" accent>
-                <ResultRow label="Profit (GRV less all costs)" value={formatCurrencyFull(cdResult.profit)} bold />
-                <ResultRow label="Margin on GRV" value={formatPercent(cdResult.marginOnGRV)} indent />
-                <ResultRow label="ROI on equity deployed" value={formatPercent(cdResult.roiOnEquity)} indent />
+                <ResultRow label="Profit" value={formatCurrencyFull(cdResult.profit)} bold formula="GRV − total project cost" />
+                <ResultRow label="Margin on GRV" value={formatPercent(cdResult.marginOnGRV)} indent formula="Profit ÷ GRV  (industry benchmark: 18–20%+)" />
+                <ResultRow label="ROI on equity deployed" value={formatPercent(cdResult.roiOnEquity)} indent formula="Profit ÷ total equity required (cash actually deployed)" />
                 <div className="my-2 border-t border-blue-200" />
-                <ResultRow label={`Profit per investor (÷ ${cd.numInvestors})`} value={formatCurrencyFull(cdResult.profitPerInvestor)} />
-                <ResultRow label="Equity per investor" value={formatCurrencyFull(cdResult.equityPerInvestor)} indent />
+                <ResultRow label={`Profit per investor (÷ ${cd.numInvestors})`} value={formatCurrencyFull(cdResult.profitPerInvestor)} formula={`Profit ÷ ${cd.numInvestors} investors`} />
+                <ResultRow label="Equity per investor" value={formatCurrencyFull(cdResult.equityPerInvestor)} indent formula={`Total equity ÷ ${cd.numInvestors} investors`} />
               </Card>
 
               {/* Equity breakdown */}
-              <Card title="Equity Deployed">
-                <ResultRow label="Land equity deposit" value={formatCurrencyFull(cdResult.landEquityDeposit)} />
-                <ResultRow label="Stamp duty" value={formatCurrencyFull(cdResult.stampDuty)} />
-                <ResultRow label="Soft costs" value={formatCurrencyFull(cdResult.softCostsTotal)} />
-                <ResultRow label="Land interest" value={formatCurrencyFull(cdResult.landInterest)} />
-                <ResultRow label="Build interest" value={formatCurrencyFull(cdResult.buildInterest)} />
-                <ResultRow label={`Build equity gap (${formatPercent(1 - cd.buildFundedPercent)} unfunded)`} value={formatCurrencyFull(cdResult.buildEquityGap)} />
-                <ResultRow label="Total equity required" value={formatCurrencyFull(cdResult.minEquityRequired)} bold />
-                <ResultRow label={`Per investor (÷ ${cd.numInvestors})`} value={formatCurrencyFull(cdResult.equityPerInvestor)} indent />
+              <Card title="Equity Deployed (Cash You Need)">
+                <ResultRow label="Land equity deposit" value={formatCurrencyFull(cdResult.landEquityDeposit)} formula={`Land price × ${formatPercent(1 - cd.landLVR)} (the ${formatPercent(1 - cd.landLVR)} the bank won't lend)`} />
+                <ResultRow label="+ Stamp duty" value={formatCurrencyFull(cdResult.stampDuty)} indent formula="Cannot be borrowed — must be paid in cash at settlement" />
+                <ResultRow label="+ Soft costs" value={formatCurrencyFull(cdResult.softCostsTotal)} indent formula="DA, demolition, legal, contingency, bank fees" />
+                <ResultRow label="+ Land interest" value={formatCurrencyFull(cdResult.landInterest)} indent formula="Paid from equity — interest-only on land loan for full hold period" />
+                <ResultRow label="+ Build interest" value={formatCurrencyFull(cdResult.buildInterest)} indent formula="Paid from equity — interest on funded portion of build, half-draw" />
+                <ResultRow label={`+ Build equity gap`} value={formatCurrencyFull(cdResult.buildEquityGap)} indent formula={`Build cost × ${formatPercent(1 - cd.buildFundedPercent)} — the portion the bank won't fund`} />
+                <ResultRow label="= Total equity required" value={formatCurrencyFull(cdResult.minEquityRequired)} bold formula="Sum of all items above (this is your actual cash commitment)" />
+                <ResultRow label={`Per investor (÷ ${cd.numInvestors})`} value={formatCurrencyFull(cdResult.equityPerInvestor)} indent formula={`Total equity ÷ ${cd.numInvestors} investors`} />
               </Card>
 
               {/* Reference */}
-              <Card title="Reference — Max Buy Price @ 18% margin">
-                <ResultRow label="Max buy price for 18% margin" value={formatCurrencyFull(cdResult.maxBuyPrice)} />
+              <Card title="Reference — Max Buy Price @ 18% Margin">
+                <ResultRow label="Max land price for 18% margin" value={formatCurrencyFull(cdResult.maxBuyPrice)} formula="Solved by the model at 18% target — same costs, same sale price" />
                 <ResultRow label="Your purchase price" value={formatCurrencyFull(cd.purchasePrice)} />
                 <ResultRow
-                  label={cdResult.vsMaxBuy <= 0 ? '✓ Under max buy by' : '✗ Over max buy by'}
+                  label={cdResult.vsMaxBuy <= 0 ? '✓ Under max buy — within feasibility' : '✗ Over max buy — margin below 18%'}
                   value={`${cdResult.vsMaxBuy >= 0 ? '+' : ''}${formatCurrencyFull(cdResult.vsMaxBuy)}`}
                   bold
+                  formula={cdResult.vsMaxBuy <= 0 ? 'You are paying less than the model\'s max — deal is within target' : 'You are paying more than the model\'s max — margin will be below 18%'}
                 />
               </Card>
             </>
