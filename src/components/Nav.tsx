@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Calculator, MapPin, Search, LogOut } from 'lucide-react'
+import { Home, Calculator, MapPin, Search, LogOut, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
@@ -12,6 +12,7 @@ const links = [
   { href: '/feasibility', label: 'Feasibility', icon: Calculator },
   { href: '/comps', label: 'Comps', icon: MapPin },
   { href: '/listings', label: 'Listings', icon: Search },
+  { href: '/admin/import', label: 'Import', icon: Upload },
 ]
 
 export default function Nav() {
