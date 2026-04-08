@@ -34,6 +34,7 @@ export default function CompsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
+  const [apiUnconfigured, setApiUnconfigured] = useState(false)
 
   const toggleType = (t: string) => {
     setPropertyTypes(prev =>
@@ -78,7 +79,14 @@ export default function CompsPage() {
       const res = await fetch('/api/domain/comps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
 
-      if (!res.ok) throw new Error(data.error || 'Search failed')
+      if (!res.ok) {
+        if (data.error?.includes('auth failed') || data.error?.includes('401') || data.error?.includes('400')) {
+          setApiUnconfigured(true)
+          throw new Error('Domain API credentials not configured. See the setup banner above.')
+        }
+        throw new Error(data.error || 'Search failed')
+      }
+      setApiUnconfigured(false)
 
       // Parse Domain API response
       const listings: SoldProperty[] = (data || []).map((item: any) => {
@@ -205,6 +213,16 @@ export default function CompsPage() {
           {loading ? 'Searching…' : 'Find Comps'}
         </button>
       </div>
+
+      {/* API setup banner */}
+      {apiUnconfigured && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+          <p className="font-semibold text-amber-800 text-sm mb-1">⚠ Domain API credentials not configured</p>
+          <p className="text-amber-700 text-xs leading-relaxed">Add your credentials to <code className="bg-amber-100 px-1 rounded">.env.local</code> in the property-tool folder:</p>
+          <pre className="mt-2 text-xs bg-amber-100 rounded-lg p-3 text-amber-900">{`DOMAIN_CLIENT_ID=your_client_id\nDOMAIN_CLIENT_SECRET=your_client_secret`}</pre>
+          <p className="text-amber-600 text-xs mt-2">Find these at <span className="font-medium">developer.domain.com.au → Property Model → Credentials</span>. Restart the dev server after adding.</p>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

@@ -51,6 +51,7 @@ export default function ListingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [sortBy, setSortBy] = useState<'price' | 'pricePerM2' | 'landSize' | 'daysListed'>('price')
+  const [apiUnconfigured, setApiUnconfigured] = useState(false)
 
   const toggleType = (t: string) =>
     setPropertyTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
@@ -76,7 +77,14 @@ export default function ListingsPage() {
 
       const res = await fetch('/api/domain/listings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Search failed')
+      if (!res.ok) {
+        if (data.error?.includes('auth failed') || data.error?.includes('401') || data.error?.includes('400')) {
+          setApiUnconfigured(true)
+          throw new Error('Domain API credentials not configured. See the setup banner above.')
+        }
+        throw new Error(data.error || 'Search failed')
+      }
+      setApiUnconfigured(false)
 
       const listings: Listing[] = (data || []).map((item: any) => {
         const l = item.listing ?? item
@@ -136,6 +144,21 @@ export default function ListingsPage() {
         <h1 className="text-xl font-bold text-gray-900">Listing Search</h1>
         <p className="text-sm text-gray-500 mt-0.5">Find active for-sale listings and check key metrics</p>
       </div>
+
+      {/* API setup banner */}
+      {apiUnconfigured && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+          <p className="font-semibold text-amber-800 text-sm mb-1">⚠ Domain API credentials not configured</p>
+          <p className="text-amber-700 text-xs leading-relaxed">
+            Add your credentials to <code className="bg-amber-100 px-1 rounded">.env.local</code> in the property-tool folder:
+          </p>
+          <pre className="mt-2 text-xs bg-amber-100 rounded-lg p-3 text-amber-900 overflow-x-auto">{`DOMAIN_CLIENT_ID=your_client_id
+DOMAIN_CLIENT_SECRET=your_client_secret`}</pre>
+          <p className="text-amber-600 text-xs mt-2">
+            Find these at <span className="font-medium">developer.domain.com.au → Property Model → Credentials</span>. Restart the dev server after adding.
+          </p>
+        </div>
+      )}
 
       {/* Search form */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
