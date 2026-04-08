@@ -101,7 +101,7 @@ function SectionToggle({ title, children }: { title: string; children: React.Rea
         <span className="text-xs font-bold uppercase tracking-widest text-gray-400">{title}</span>
         {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
       </button>
-      {open && <div className="px-4 pb-4 grid grid-cols-2 gap-3">{children}</div>}
+      {open && <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>}
     </div>
   )
 }
@@ -272,11 +272,11 @@ export default function FeasibilityPage() {
       </div>
 
       {/* Mode tabs */}
-      <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-xl w-full sm:w-fit">
         {([['max-buy', 'Find Max Buy Price', '→ what should I pay?'], ['check-deal', 'Check a Deal', '→ what will I make?']] as const).map(([m, label, hint]) => (
-          <button key={m} onClick={() => setMode(m)} className={cn('px-5 py-2.5 rounded-lg text-sm font-medium transition-all text-left', mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
+          <button key={m} onClick={() => setMode(m)} className={cn('flex-1 sm:flex-none px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-all text-left', mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
             {label}
-            <span className={cn('block text-[11px] mt-0.5', mode === m ? 'text-gray-400' : 'text-gray-400')}>{hint}</span>
+            <span className={cn('block text-[11px] mt-0.5 text-gray-400')}>{hint}</span>
           </button>
         ))}
       </div>
