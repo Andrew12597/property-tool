@@ -54,6 +54,7 @@ function Inp({
         <input
           type="number" value={value} step={step ?? 1} min={min ?? 0} max={max}
           onChange={e => onChange(parseFloat(e.target.value) || 0)}
+          onFocus={e => e.target.select()}
           className="flex-1 px-3 py-2 text-sm bg-transparent outline-none text-gray-900 tabular-nums"
         />
         {suffix && <span className="pr-3 text-gray-400 text-sm select-none">{suffix}</span>}
