@@ -106,6 +106,41 @@ function SectionToggle({ title, children }: { title: string; children: React.Rea
   )
 }
 
+// ─── Build Cost Toggle (must be outside page component to avoid focus loss) ──
+
+function BuildCostToggle({ inputs, set, bc }: {
+  inputs: MaxBuyInputs | CheckDealInputs
+  set: (k: any, v: any) => void
+  bc: { flat: number; perM2: number }
+}) {
+  return (
+    <>
+      <div className="col-span-2">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-xs font-medium text-gray-500">Build cost as</span>
+          <button
+            onClick={() => set('buildCostMode', inputs.buildCostMode === 'per-m2' ? 'flat' : 'per-m2')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-medium text-gray-700"
+          >
+            <ArrowUpDown size={12} />
+            {inputs.buildCostMode === 'per-m2' ? '$/m² mode' : 'Flat total mode'}
+          </button>
+          <span className="text-xs text-gray-400">
+            {inputs.buildCostMode === 'per-m2'
+              ? `= ${formatCurrencyFull(bc.flat)} total`
+              : `= $${formatNumber(bc.perM2)}/m²`}
+          </span>
+        </div>
+      </div>
+      <Inp label="Build area / dwelling" value={inputs.buildAreaPerDwelling} onChange={v => set('buildAreaPerDwelling', v)} suffix="m²" step={10} />
+      {inputs.buildCostMode === 'per-m2'
+        ? <Inp label="Build cost / m²" value={inputs.buildCostPerM2} onChange={v => set('buildCostPerM2', v)} prefix="$" step={100} />
+        : <Inp label="Total build cost" value={inputs.buildCostFlat} onChange={v => set('buildCostFlat', v)} prefix="$" step={10_000} />
+      }
+    </>
+  )
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function FeasibilityPage() {
@@ -220,34 +255,6 @@ export default function FeasibilityPage() {
   const inputs = mode === 'max-buy' ? mb : cd
   const bc = buildCostDisplay(inputs)
 
-  // Build cost toggle row
-  const BuildCostToggle = ({ set }: { set: (k: any, v: any) => void }) => (
-    <>
-      <div className="col-span-2">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-xs font-medium text-gray-500">Build cost as</span>
-          <button
-            onClick={() => set('buildCostMode', inputs.buildCostMode === 'per-m2' ? 'flat' : 'per-m2')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-medium text-gray-700"
-          >
-            <ArrowUpDown size={12} />
-            {inputs.buildCostMode === 'per-m2' ? '$/m² mode' : 'Flat total mode'}
-          </button>
-          <span className="text-xs text-gray-400">
-            {inputs.buildCostMode === 'per-m2'
-              ? `= ${formatCurrencyFull(bc.flat)} total`
-              : `= $${formatNumber(bc.perM2)}/m²`}
-          </span>
-        </div>
-      </div>
-      <Inp label="Build area / dwelling" value={inputs.buildAreaPerDwelling} onChange={v => set('buildAreaPerDwelling', v)} suffix="m²" step={10} />
-      {inputs.buildCostMode === 'per-m2'
-        ? <Inp label="Build cost / m²" value={inputs.buildCostPerM2} onChange={v => set('buildCostPerM2', v)} prefix="$" step={100} />
-        : <Inp label="Total build cost" value={inputs.buildCostFlat} onChange={v => set('buildCostFlat', v)} prefix="$" step={10_000} />
-      }
-    </>
-  )
-
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
@@ -300,7 +307,7 @@ export default function FeasibilityPage() {
               </SectionToggle>
 
               <SectionToggle title="Build">
-                <BuildCostToggle set={setM} />
+                <BuildCostToggle inputs={mb} set={setM} bc={buildCostDisplay(mb)} />
                 <Inp label="Build time" value={mb.buildTimeMonths} onChange={v => setM('buildTimeMonths', v)} suffix="mths" />
                 <Inp label="Purchase to settlement" value={mb.purchaseToSaleMonths} onChange={v => setM('purchaseToSaleMonths', v)} suffix="mths" />
               </SectionToggle>
@@ -318,7 +325,7 @@ export default function FeasibilityPage() {
               </SectionToggle>
 
               <SectionToggle title="Build">
-                <BuildCostToggle set={setC} />
+                <BuildCostToggle inputs={cd} set={setC} bc={buildCostDisplay(cd)} />
                 <Inp label="Build time" value={cd.buildTimeMonths} onChange={v => setC('buildTimeMonths', v)} suffix="mths" />
                 <Inp label="Purchase to settlement" value={cd.purchaseToSaleMonths} onChange={v => setC('purchaseToSaleMonths', v)} suffix="mths" />
               </SectionToggle>
