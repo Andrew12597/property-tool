@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
-import { Upload, CheckCircle, AlertCircle, Database, MapPin } from 'lucide-react'
+import { Upload, CheckCircle, AlertCircle, Database, MapPin, Link as LinkIcon } from 'lucide-react'
 
 interface ParsedRecord {
   address: string
@@ -130,6 +130,8 @@ function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
 export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [tab, setTab] = useState<'url' | 'file'>('url')
+  const [downloadUrl, setDownloadUrl] = useState('')
   const [format, setFormat] = useState<'nsw-vg' | 'csv'>('nsw-vg')
   const [step, setStep] = useState<Step>('idle')
   const [progress, setProgress] = useState('')
@@ -143,6 +145,55 @@ export default function ImportPage() {
   }
 
   useState(() => { loadStats() })
+
+  const geocodeAndUploadSuburbs = async (suburbs: { suburb: string; state: string }[]) => {
+    const geocoded: { suburb: string; state: string; lat: number; lng: number }[] = []
+    let geo = 0
+    for (const { suburb, state } of suburbs) {
+      setProgress(`Geocoding suburbs… ${++geo}/${suburbs.length} (${suburb})`)
+      const coord = await geocodeSuburb(suburb, state)
+      if (coord) geocoded.push({ suburb, state, ...coord })
+      await sleep(1150)
+    }
+    if (geocoded.length) {
+      setProgress('Saving suburb locations…')
+      await fetch('/api/import', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geocoded),
+      })
+    }
+    return geocoded.length
+  }
+
+  const handleUrlImport = async () => {
+    if (!downloadUrl.trim()) return
+    setStep('parsing')
+    setProgress('Downloading file from government website…')
+    setErrorMsg('')
+
+    try {
+      const res = await fetch('/api/fetch-govt-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: downloadUrl.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Download failed')
+
+      setProgress(`Imported ${data.records.toLocaleString()} records. Now geocoding ${data.suburbs.length} suburbs…`)
+      setStep('geocoding')
+
+      const geocodedCount = await geocodeAndUploadSuburbs(data.suburbs)
+
+      setResult({ records: data.records, suburbs: geocodedCount })
+      setStep('done')
+      loadStats()
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Import failed')
+      setStep('error')
+    }
+  }
 
   const handleImport = async () => {
     const file = fileRef.current?.files?.[0]
@@ -179,24 +230,7 @@ export default function ImportPage() {
 
       // Geocode suburbs
       setStep('geocoding')
-      const geocoded: { suburb: string; state: string; lat: number; lng: number }[] = []
-      let geo = 0
-      for (const { suburb, state } of uniqueSuburbs) {
-        setProgress(`Geocoding suburbs… ${++geo}/${uniqueSuburbs.length} (${suburb})`)
-        const coord = await geocodeSuburb(suburb, state)
-        if (coord) geocoded.push({ suburb, state, ...coord })
-        await sleep(1150) // Nominatim rate limit: 1 req/sec
-      }
-
-      // Upload suburb centroids
-      setProgress('Uploading suburb centroids…')
-      if (geocoded.length) {
-        await fetch('/api/import', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(geocoded),
-        })
-      }
+      const geocodedCount = await geocodeAndUploadSuburbs(uniqueSuburbs)
 
       // Upload property sales in batches
       setStep('uploading')
@@ -213,7 +247,7 @@ export default function ImportPage() {
         uploaded += batch.length
       }
 
-      setResult({ records: uploaded, suburbs: geocoded.length })
+      setResult({ records: uploaded, suburbs: geocodedCount })
       setStep('done')
       loadStats()
 
@@ -250,74 +284,84 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 text-sm text-blue-900">
-        <p className="font-semibold mb-3">How to get the data (free)</p>
-        <div className="space-y-3">
-          <div>
-            <p className="font-medium">NSW — Valuer General</p>
-            <ol className="list-decimal list-inside text-blue-800 text-xs mt-1 space-y-1 ml-2">
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6">
+        {([['url', LinkIcon, 'Auto-import from URL'], ['file', Upload, 'Upload a file']] as const).map(([id, Icon, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Icon size={14} />{label}
+          </button>
+        ))}
+      </div>
+
+      {/* URL tab */}
+      {tab === 'url' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4 space-y-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-xs text-blue-800 space-y-2">
+            <p className="font-semibold">Get the download URL from NSW Valuer General:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-1">
               <li>Go to <span className="font-mono bg-blue-100 px-1 rounded">valuergeneral.nsw.gov.au</span></li>
               <li>Click <strong>Property Sales Information → Bulk Sales</strong></li>
-              <li>Download any weekly or annual ZIP file</li>
-              <li>Extract the ZIP — you'll get <strong>.DAT files</strong> (one per district)</li>
-              <li>Upload one DAT file at a time here using the <strong>NSW Valuer General</strong> format</li>
+              <li><strong>Right-click</strong> a weekly ZIP download link → <strong>Copy link address</strong></li>
+              <li>Paste it below — the app downloads, extracts and imports it automatically</li>
             </ol>
           </div>
           <div>
-            <p className="font-medium">QLD — Titles Registry</p>
-            <ol className="list-decimal list-inside text-blue-800 text-xs mt-1 space-y-1 ml-2">
-              <li>Go to <span className="font-mono bg-blue-100 px-1 rounded">data.qld.gov.au</span></li>
-              <li>Search <strong>"Queensland property sales"</strong></li>
-              <li>Download as CSV</li>
-              <li>Use the <strong>Generic CSV</strong> format and map columns: address, suburb, state, price, date, land_size</li>
-            </ol>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Download URL</label>
+            <input
+              type="url"
+              value={downloadUrl}
+              onChange={e => setDownloadUrl(e.target.value)}
+              placeholder="https://www.valuergeneral.nsw.gov.au/..."
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
           </div>
-        </div>
-      </div>
-
-      {/* Format selector */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">File Format</p>
-        <div className="flex gap-3">
-          {[
-            { id: 'nsw-vg', label: 'NSW Valuer General', desc: 'Semicolon-delimited .DAT file' },
-            { id: 'csv', label: 'Generic CSV', desc: 'CSV with header row: address, suburb, state, price, date, land_size, property_type' },
-          ].map(f => (
-            <button
-              key={f.id}
-              onClick={() => setFormat(f.id as any)}
-              className={`flex-1 text-left p-3 rounded-lg border-2 transition-colors ${format === f.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-            >
-              <p className={`font-medium text-sm ${format === f.id ? 'text-blue-700' : 'text-gray-700'}`}>{f.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{f.desc}</p>
+          {(step === 'idle' || step === 'error' || step === 'done') && (
+            <button onClick={handleUrlImport} disabled={!downloadUrl.trim()}
+              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm">
+              Download &amp; Import
             </button>
-          ))}
+          )}
         </div>
-      </div>
+      )}
 
-      {/* File upload */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Select File</p>
-        <div
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-colors"
-        >
-          <Upload size={24} className="mx-auto mb-2 text-gray-400" />
-          <p className="text-sm text-gray-600 font-medium">Click to select file</p>
-          <p className="text-xs text-gray-400 mt-1">{format === 'nsw-vg' ? '.DAT or .txt file' : '.CSV file'}</p>
-        </div>
-        <input ref={fileRef} type="file" accept={format === 'nsw-vg' ? '.dat,.txt,.DAT' : '.csv'} className="hidden" />
-      </div>
+      {/* File tab */}
+      {tab === 'file' && (
+        <>
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">File Format</p>
+            <div className="flex gap-3">
+              {[
+                { id: 'nsw-vg', label: 'NSW Valuer General', desc: 'Semicolon-delimited .DAT file' },
+                { id: 'csv', label: 'Generic CSV', desc: 'Headers: address, suburb, state, price, date, land_size, property_type' },
+              ].map(f => (
+                <button key={f.id} onClick={() => setFormat(f.id as any)}
+                  className={`flex-1 text-left p-3 rounded-lg border-2 transition-colors ${format === f.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <p className={`font-medium text-sm ${format === f.id ? 'text-blue-700' : 'text-gray-700'}`}>{f.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{f.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Import button */}
-      {(step === 'idle' || step === 'error' || step === 'done') && (
-        <button
-          onClick={handleImport}
-          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors text-sm"
-        >
-          Start Import
-        </button>
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Select File</p>
+            <div onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-colors">
+              <Upload size={24} className="mx-auto mb-2 text-gray-400" />
+              <p className="text-sm text-gray-600 font-medium">Click to select file</p>
+              <p className="text-xs text-gray-400 mt-1">{format === 'nsw-vg' ? '.DAT or .txt file' : '.CSV file'}</p>
+            </div>
+            <input ref={fileRef} type="file" accept={format === 'nsw-vg' ? '.dat,.txt,.DAT' : '.csv'} className="hidden" />
+          </div>
+
+          {(step === 'idle' || step === 'error' || step === 'done') && (
+            <button onClick={handleImport}
+              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors text-sm mb-4">
+              Start Import
+            </button>
+          )}
+        </>
       )}
 
       {/* Progress */}
