@@ -130,7 +130,10 @@ function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
 export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [tab, setTab] = useState<'url' | 'file'>('url')
+  const [tab, setTab] = useState<'nsw' | 'file'>('nsw')
+  const [nswMode, setNswMode] = useState<'annual' | 'weekly'>('annual')
+  const [nswYear, setNswYear] = useState(new Date().getFullYear() - 1)
+  const [nswWeekDate, setNswWeekDate] = useState('')
   const [downloadUrl, setDownloadUrl] = useState('')
   const [format, setFormat] = useState<'nsw-vg' | 'csv'>('nsw-vg')
   const [step, setStep] = useState<Step>('idle')
@@ -166,8 +169,9 @@ export default function ImportPage() {
     return geocoded.length
   }
 
-  const handleUrlImport = async () => {
-    if (!downloadUrl.trim()) return
+  const handleUrlImport = async (overrideUrl?: string) => {
+    const url = overrideUrl ?? downloadUrl.trim()
+    if (!url) return
     setStep('parsing')
     setProgress('Downloading file from government website…')
     setErrorMsg('')
@@ -176,7 +180,7 @@ export default function ImportPage() {
       const res = await fetch('/api/fetch-govt-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: downloadUrl.trim() }),
+        body: JSON.stringify({ url }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Download failed')
@@ -286,40 +290,71 @@ export default function ImportPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6">
-        {([['url', LinkIcon, 'Auto-import from URL'], ['file', Upload, 'Upload a file']] as const).map(([id, Icon, label]) => (
-          <button key={id} onClick={() => setTab(id)}
+        {([['nsw', Database, 'NSW Govt Data'], ['file', Upload, 'Upload a file']] as const).map(([id, Icon, label]) => (
+          <button key={id} onClick={() => setTab(id as any)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
             <Icon size={14} />{label}
           </button>
         ))}
       </div>
 
-      {/* URL tab */}
-      {tab === 'url' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4 space-y-4">
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-xs text-blue-800 space-y-2">
-            <p className="font-semibold">Get the download URL from NSW Valuer General:</p>
-            <ol className="list-decimal list-inside space-y-1 ml-1">
-              <li>Go to <span className="font-mono bg-blue-100 px-1 rounded">valuergeneral.nsw.gov.au</span></li>
-              <li>Click <strong>Property Sales Information → Bulk Sales</strong></li>
-              <li><strong>Right-click</strong> a weekly ZIP download link → <strong>Copy link address</strong></li>
-              <li>Paste it below — the app downloads, extracts and imports it automatically</li>
-            </ol>
-          </div>
+      {/* NSW tab */}
+      {tab === 'nsw' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4 space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Download URL</label>
-            <input
-              type="url"
-              value={downloadUrl}
-              onChange={e => setDownloadUrl(e.target.value)}
-              placeholder="https://www.valuergeneral.nsw.gov.au/..."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            />
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Data source</p>
+            <div className="flex gap-2">
+              {([['annual', 'Annual (full year)'], ['weekly', 'Weekly update']] as const).map(([id, label]) => (
+                <button key={id} onClick={() => setNswMode(id)}
+                  className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${nswMode === id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {nswMode === 'annual' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Year</label>
+              <select value={nswYear} onChange={e => setNswYear(parseInt(e.target.value))}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white">
+                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 1 - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-2">Full year of NSW property sales — larger file, takes longer to import.</p>
+            </div>
+          )}
+
+          {nswMode === 'weekly' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Week ending (Monday)</label>
+              <input type="date" value={nswWeekDate} onChange={e => setNswWeekDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white" />
+              <p className="text-xs text-gray-400 mt-2">One week of sales data for NSW. Run multiple weeks to build up your database.</p>
+            </div>
+          )}
+
+          <div className="bg-gray-50 rounded-lg px-4 py-3 text-xs text-gray-500 font-mono break-all">
+            {nswMode === 'annual'
+              ? `https://www.valuergeneral.nsw.gov.au/__psi/yearly/${nswYear}.zip`
+              : nswWeekDate
+                ? `https://www.valuergeneral.nsw.gov.au/__psi/weekly/${nswWeekDate.replace(/-/g, '')}.zip`
+                : 'Select a date above'}
+          </div>
+
           {(step === 'idle' || step === 'error' || step === 'done') && (
-            <button onClick={handleUrlImport} disabled={!downloadUrl.trim()}
+            <button
+              onClick={() => {
+                const url = nswMode === 'annual'
+                  ? `https://www.valuergeneral.nsw.gov.au/__psi/yearly/${nswYear}.zip`
+                  : `https://www.valuergeneral.nsw.gov.au/__psi/weekly/${nswWeekDate.replace(/-/g, '')}.zip`
+                handleUrlImport(url)
+              }}
+              disabled={nswMode === 'weekly' && !nswWeekDate}
               className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm">
-              Download &amp; Import
+              Import NSW Data
             </button>
           )}
         </div>
