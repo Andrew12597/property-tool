@@ -132,7 +132,7 @@ export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [tab, setTab] = useState<'nsw' | 'file'>('nsw')
   const [nswMode, setNswMode] = useState<'annual' | 'weekly'>('annual')
-  const [nswYear, setNswYear] = useState(new Date().getFullYear() - 1)
+  const [nswYear, setNswYear] = useState(new Date().getFullYear())
   const [nswWeekDate, setNswWeekDate] = useState('')
   const [downloadUrl, setDownloadUrl] = useState('')
   const [format, setFormat] = useState<'nsw-vg' | 'csv'>('nsw-vg')
@@ -318,7 +318,7 @@ export default function ImportPage() {
               <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Year</label>
               <select value={nswYear} onChange={e => setNswYear(parseInt(e.target.value))}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white">
-                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 1 - i).map(y => (
+                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
