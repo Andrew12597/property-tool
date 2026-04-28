@@ -225,8 +225,8 @@ export default function CompsPage() {
 
         {/* Street mode inputs */}
         {searchMode === 'street' && (
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1">
+          <div className="space-y-3 mb-4">
+            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Street name</label>
               <AutocompleteInput
                 value={streetName}
@@ -238,21 +238,23 @@ export default function CompsPage() {
                 icon={<Navigation size={15} />}
               />
             </div>
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb</label>
-              <AutocompleteInput
-                value={suburbFilter}
-                onChange={v => { setSuburbFilter(v); setSuburbState('NSW') }}
-                onSelect={s => { setSuburbFilter(s.suburb); setSuburbState(s.state) }}
-                type="suburb"
-                placeholder="e.g. Sydney"
-                icon={<MapPin size={15} />}
-              />
-            </div>
-            <div className="w-24">
-              <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
-              <div className="flex items-center justify-center h-[42px] border border-gray-200 rounded-lg bg-gray-50 text-sm font-medium text-gray-500 px-3">
-                {suburbState || 'NSW'}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Suburb</label>
+                <AutocompleteInput
+                  value={suburbFilter}
+                  onChange={v => { setSuburbFilter(v); setSuburbState('NSW') }}
+                  onSelect={s => { setSuburbFilter(s.suburb); setSuburbState(s.state) }}
+                  type="suburb"
+                  placeholder="e.g. Sydney"
+                  icon={<MapPin size={15} />}
+                />
+              </div>
+              <div className="w-20 shrink-0">
+                <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                <div className="flex items-center justify-center h-[42px] border border-gray-200 rounded-lg bg-gray-50 text-sm font-medium text-gray-500 px-2">
+                  {suburbState || 'NSW'}
+                </div>
               </div>
             </div>
           </div>
@@ -287,10 +289,10 @@ export default function CompsPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">Property type</label>
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-2">
               {PROPERTY_TYPES.map(t => (
                 <button key={t} onClick={() => toggleType(t)}
                   className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
@@ -298,13 +300,11 @@ export default function CompsPage() {
                   {t}
                 </button>
               ))}
-              <span className="text-xs text-gray-400 ml-1">Govt data doesn't separate House/Unit/Duplex</span>
             </div>
           </div>
-
           <button onClick={search}
             disabled={loading || (searchMode === 'address' ? !address.trim() : searchMode === 'suburb' ? !suburbOnly.trim() : !streetName.trim())}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0">
+            className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
             <Search size={15} />
             {loading ? 'Searching…' : 'Find Comps'}
           </button>
@@ -327,25 +327,40 @@ export default function CompsPage() {
       {results.length > 0 && (
         <>
           <PriceTrendChart sales={results} />
-          <div className="grid grid-cols-3 gap-4 mb-6">
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
             {[
-              { label: 'Properties found', value: results.length.toString(), icon: MapPin },
-              { label: 'Average sale price', value: formatCurrencyFull(avgPrice), icon: DollarSign },
+              { label: 'Found', value: results.length.toString(), icon: MapPin },
+              { label: 'Avg price', value: formatCurrencyFull(avgPrice), icon: DollarSign },
               { label: 'Avg $/m²', value: avgPricePerM2 ? `$${formatNumber(avgPricePerM2)}` : '—', icon: TrendingUp },
             ].map(({ label, value, icon: Icon }) => (
-              <div key={label} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3">
-                <div className="bg-blue-50 rounded-lg p-2 text-blue-600"><Icon size={18} /></div>
-                <div>
-                  <p className="text-xs text-gray-500">{label}</p>
-                  <p className="font-semibold text-gray-900 text-sm">{value}</p>
+              <div key={label} className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+                <div className="bg-blue-50 rounded-lg p-1.5 sm:p-2 text-blue-600 shrink-0"><Icon size={16} /></div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs text-gray-500 truncate">{label}</p>
+                  <p className="font-semibold text-gray-900 text-xs sm:text-sm truncate">{value}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {/* Sort bar (mobile) */}
+          <div className="sm:hidden flex gap-2 mb-3 overflow-x-auto pb-1">
+            {([['sold_date', 'Date'], ['price', 'Price'], ['land_size', 'Land'], ['pricePerM2', '$/m²']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => toggleSort(k)}
+                className={cn('flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border shrink-0 transition-colors',
+                  sortKey === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200')}>
+                {label}
+                {sortKey === k && (sortDir === 'desc' ? <ArrowDown size={10} /> : <ArrowUp size={10} />)}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Results — click column headers to sort</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Results — click headers to sort</p>
               <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-full">NSW Govt Data</span>
             </div>
             <div className="overflow-x-auto">
@@ -353,18 +368,10 @@ export default function CompsPage() {
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Address</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('price')}>
-                      Sale Price <SortIcon k="price" />
-                    </th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('land_size')}>
-                      Land m² <SortIcon k="land_size" />
-                    </th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('pricePerM2')}>
-                      $/m² <SortIcon k="pricePerM2" />
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('sold_date')}>
-                      Sold <SortIcon k="sold_date" />
-                    </th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('price')}>Sale Price <SortIcon k="price" /></th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('land_size')}>Land m² <SortIcon k="land_size" /></th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('pricePerM2')}>$/m² <SortIcon k="pricePerM2" /></th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('sold_date')}>Sold <SortIcon k="sold_date" /></th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
                   </tr>
                 </thead>
@@ -378,15 +385,34 @@ export default function CompsPage() {
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{formatCurrencyFull(p.price)}</td>
                       <td className="px-4 py-3 text-right text-gray-600 tabular-nums">{p.land_size ? formatNumber(p.land_size) : '—'}</td>
                       <td className="px-4 py-3 text-right text-gray-600 tabular-nums">{p.pricePerM2 ? `$${formatNumber(p.pricePerM2)}` : '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                        {new Date(p.sold_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(p.sold_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                       <td className="px-4 py-3 text-gray-500">{p.property_type ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2">
+            {sorted.map(p => (
+              <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm leading-snug">{p.address}</p>
+                    <p className="text-xs text-gray-400">{p.suburb}{p.postcode ? ` ${p.postcode}` : ''}</p>
+                  </div>
+                  <p className="font-bold text-blue-700 text-sm shrink-0">{formatCurrencyFull(p.price)}</p>
+                </div>
+                <div className="flex gap-4 text-xs text-gray-500">
+                  <span>{new Date(p.sold_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  {p.land_size && <span>{formatNumber(p.land_size)} m²</span>}
+                  {p.pricePerM2 && <span>${formatNumber(p.pricePerM2)}/m²</span>}
+                  {p.property_type && <span>{p.property_type}</span>}
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}

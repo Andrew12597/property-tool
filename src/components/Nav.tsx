@@ -93,8 +93,8 @@ export default function Nav() {
       </nav>
 
       {/* ── Mobile bottom tab bar ── */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200">
-        <div className="grid grid-cols-4">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-area-bottom">
+        <div className="grid grid-cols-5">
           {links.map(({ href, label, icon: Icon }) => {
             const active = path === href
             return (
