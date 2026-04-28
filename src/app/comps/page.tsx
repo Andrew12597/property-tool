@@ -230,7 +230,7 @@ export default function CompsPage() {
               <AutocompleteInput
                 value={streetName}
                 onChange={setStreetName}
-                onSelect={s => setStreetName(s.street)}
+                onSelect={s => { setStreetName(s.street); if (s.suburb) { setSuburbFilter(s.suburb); setSuburbState(s.state || 'NSW') } }}
                 type="street"
                 streetContext={suburbFilter}
                 placeholder="George Street"
