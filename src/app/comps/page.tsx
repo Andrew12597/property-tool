@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { MapPin, Search, TrendingUp, DollarSign, Database } from 'lucide-react'
+import { MapPin, Search, TrendingUp, DollarSign, Database, Navigation } from 'lucide-react'
 import { formatCurrencyFull, formatNumber, cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -17,17 +17,27 @@ interface SoldProperty {
   pricePerM2: number | null
 }
 
-const PROPERTY_TYPES = ['House', 'Land', 'Commercial', 'Residential']
+const PROPERTY_TYPES = ['House', 'Land']
 
 export default function CompsPage() {
+  const [searchMode, setSearchMode] = useState<'radius' | 'street'>('radius')
+
+  // Radius mode
   const [address, setAddress] = useState('')
   const [radiusKm, setRadiusKm] = useState(1)
+
+  // Street mode
+  const [streetName, setStreetName] = useState('')
+  const [suburbFilter, setSuburbFilter] = useState('')
+
+  // Common filters
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [minLand, setMinLand] = useState('')
   const [maxLand, setMaxLand] = useState('')
   const [soldAfterMonths, setSoldAfterMonths] = useState(24)
   const [propertyTypes, setPropertyTypes] = useState<string[]>([])
+
   const [results, setResults] = useState<SoldProperty[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,44 +48,47 @@ export default function CompsPage() {
     setPropertyTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
 
   const search = async () => {
-    if (!address.trim()) return
+    if (searchMode === 'radius' && !address.trim()) return
+    if (searchMode === 'street' && !streetName.trim()) return
+
     setLoading(true)
     setError(null)
     setSearched(true)
     setNoSuburbs(false)
 
     try {
+      const body: any = {
+        mode: searchMode,
+        minPrice: minPrice ? parseInt(minPrice) : undefined,
+        maxPrice: maxPrice ? parseInt(maxPrice) : undefined,
+        minLandSize: minLand ? parseInt(minLand) : undefined,
+        maxLandSize: maxLand ? parseInt(maxLand) : undefined,
+        soldAfterMonths,
+        propertyTypes: propertyTypes.length ? propertyTypes : undefined,
+      }
+
+      if (searchMode === 'radius') {
+        body.address = address
+        body.radiusKm = radiusKm
+      } else {
+        body.streetName = streetName
+        body.suburb = suburbFilter
+      }
+
       const res = await fetch('/api/comps-internal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address,
-          radiusKm,
-          minPrice: minPrice ? parseInt(minPrice) : undefined,
-          maxPrice: maxPrice ? parseInt(maxPrice) : undefined,
-          minLandSize: minLand ? parseInt(minLand) : undefined,
-          maxLandSize: maxLand ? parseInt(maxLand) : undefined,
-          soldAfterMonths,
-          propertyTypes: propertyTypes.length ? propertyTypes : undefined,
-        }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Search failed')
-      }
-
-      if (data.noSuburbs) {
-        setNoSuburbs(true)
-        setResults([])
-        return
-      }
+      if (!res.ok) throw new Error(data.error || 'Search failed')
+      if (data.noSuburbs) { setNoSuburbs(true); setResults([]); return }
 
       const sales: SoldProperty[] = (data.results || []).map((r: any) => ({
         ...r,
         pricePerM2: r.price && r.land_size ? Math.round(r.price / r.land_size) : null,
       }))
-
       setResults(sales)
     } catch (err: any) {
       setError(err.message)
@@ -99,29 +112,68 @@ export default function CompsPage() {
 
       {/* Search form */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
-          <div className="flex items-center border border-gray-200 rounded-lg focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
-            <MapPin size={16} className="ml-3 text-gray-400 shrink-0" />
-            <input
-              type="text"
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && search()}
-              placeholder="123 Main Street, Parramatta NSW"
-              className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none"
-            />
-          </div>
+
+        {/* Mode toggle */}
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-4">
+          {([['radius', MapPin, 'Suburb / Radius'], ['street', Navigation, 'Street Name']] as const).map(([id, Icon, label]) => (
+            <button key={id} onClick={() => setSearchMode(id)}
+              className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all',
+                searchMode === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
+              <Icon size={13} />{label}
+            </button>
+          ))}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
-            <div className="flex items-center border border-gray-200 rounded-lg bg-white">
-              <input type="number" value={radiusKm} onChange={e => setRadiusKm(parseFloat(e.target.value) || 1)} step={0.5} min={0.5} onFocus={e => e.target.select()} className="flex-1 px-3 py-2 text-sm outline-none" />
-              <span className="pr-3 text-gray-400 text-sm">km</span>
+        {/* Radius mode inputs */}
+        {searchMode === 'radius' && (
+          <div className="flex gap-3 mb-4">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb or address</label>
+              <div className="flex items-center border border-gray-200 rounded-lg focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+                <MapPin size={15} className="ml-3 text-gray-400 shrink-0" />
+                <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && search()}
+                  placeholder="Parramatta NSW"
+                  className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none" />
+              </div>
+            </div>
+            <div className="w-28">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
+              <div className="flex items-center border border-gray-200 rounded-lg">
+                <input type="number" value={radiusKm} onChange={e => setRadiusKm(parseFloat(e.target.value) || 1)}
+                  step={0.5} min={0.5} onFocus={e => e.target.select()}
+                  className="flex-1 px-3 py-2.5 text-sm outline-none w-0" />
+                <span className="pr-3 text-gray-400 text-sm">km</span>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* Street mode inputs */}
+        {searchMode === 'street' && (
+          <div className="flex gap-3 mb-4">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Street name</label>
+              <div className="flex items-center border border-gray-200 rounded-lg focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+                <Navigation size={15} className="ml-3 text-gray-400 shrink-0" />
+                <input type="text" value={streetName} onChange={e => setStreetName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && search()}
+                  placeholder="George Street"
+                  className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb (optional)</label>
+              <input type="text" value={suburbFilter} onChange={e => setSuburbFilter(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && search()}
+                placeholder="e.g. Sydney"
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-400" />
+            </div>
+          </div>
+        )}
+
+        {/* Common filters */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Sold within</label>
             <div className="flex items-center border border-gray-200 rounded-lg bg-white">
@@ -147,30 +199,30 @@ export default function CompsPage() {
             <label className="block text-xs font-medium text-gray-600 mb-1">Min land (m²)</label>
             <input type="number" value={minLand} onChange={e => setMinLand(e.target.value)} onFocus={e => e.target.select()} placeholder="Any" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-400" />
           </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Max land (m²)</label>
-            <input type="number" value={maxLand} onChange={e => setMaxLand(e.target.value)} onFocus={e => e.target.select()} placeholder="Any" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-400" />
+            <label className="block text-xs font-medium text-gray-600 mb-2">Property type</label>
+            <div className="flex flex-wrap gap-2">
+              {PROPERTY_TYPES.map(t => (
+                <button key={t} onClick={() => toggleType(t)}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                    propertyTypes.includes(t) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300')}>
+                  {t}
+                </button>
+              ))}
+              <span className="text-xs text-gray-400 self-center ml-1">Note: govt data doesn't split House/Unit/Duplex</span>
+            </div>
           </div>
-        </div>
 
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-2">Property type (optional)</label>
-          <div className="flex flex-wrap gap-2">
-            {PROPERTY_TYPES.map(t => (
-              <button key={t} onClick={() => toggleType(t)}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                  propertyTypes.includes(t) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300')}>
-                {t}
-              </button>
-            ))}
-          </div>
+          <button onClick={search}
+            disabled={loading || (searchMode === 'radius' ? !address.trim() : !streetName.trim())}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0">
+            <Search size={15} />
+            {loading ? 'Searching…' : 'Find Comps'}
+          </button>
         </div>
-
-        <button onClick={search} disabled={loading || !address.trim()}
-          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-          <Search size={15} />
-          {loading ? 'Searching…' : 'Find Comps'}
-        </button>
       </div>
 
       {/* No suburb data banner */}

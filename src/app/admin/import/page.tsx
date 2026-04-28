@@ -169,6 +169,83 @@ export default function ImportPage() {
     return geocoded.length
   }
 
+  const handleSyncAll2026 = async () => {
+    setStep('parsing')
+    setErrorMsg('')
+
+    // Generate all Mondays from 2026-01-05 up to 2 weeks ago
+    const mondays: string[] = []
+    const d = new Date('2026-01-05')
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 14)
+    while (d <= cutoff) {
+      mondays.push(d.toISOString().slice(0, 10).replace(/-/g, ''))
+      d.setDate(d.getDate() + 7)
+    }
+
+    // Check already-imported weeks
+    let importedWeeks = new Set<string>()
+    try {
+      const res = await fetch('/api/import?type=weekly')
+      if (res.ok) {
+        const data = await res.json()
+        importedWeeks = new Set(data.importedWeeks || [])
+      }
+    } catch { /* if table doesn't exist yet, import all */ }
+
+    const toImport = mondays.filter(w => !importedWeeks.has(w))
+
+    if (!toImport.length) {
+      setProgress('All 2026 weeks already imported!')
+      setResult({ records: 0, suburbs: 0 })
+      setStep('done')
+      return
+    }
+
+    setProgress(`Found ${toImport.length} weeks to import (${importedWeeks.size} already done)…`)
+
+    let totalRecords = 0
+    const allSuburbs: { suburb: string; state: string }[] = []
+    const suburbsSeen = new Set<string>()
+
+    for (let i = 0; i < toImport.length; i++) {
+      const dateStr = toImport[i]
+      const url = `https://www.valuergeneral.nsw.gov.au/__psi/weekly/${dateStr}.zip`
+      setProgress(`Importing week ${i + 1}/${toImport.length}: ${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}…`)
+
+      try {
+        const res = await fetch('/api/fetch-govt-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, trackWeek: dateStr }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          if (data.error?.includes('404') || data.error?.includes('not found')) continue
+          console.error(`Week ${dateStr}: ${data.error}`)
+          continue
+        }
+        totalRecords += data.records
+        for (const s of (data.suburbs || [])) {
+          const key = `${s.suburb}|${s.state}`
+          if (!suburbsSeen.has(key)) {
+            suburbsSeen.add(key)
+            allSuburbs.push(s)
+          }
+        }
+      } catch (err: any) {
+        console.error(`Week ${dateStr}: ${err.message}`)
+      }
+    }
+
+    setProgress(`Imported ${totalRecords.toLocaleString()} records. Geocoding ${allSuburbs.length} new suburbs…`)
+    setStep('geocoding')
+    const geocodedCount = await geocodeAndUploadSuburbs(allSuburbs)
+    setResult({ records: totalRecords, suburbs: geocodedCount })
+    setStep('done')
+    loadStats()
+  }
+
   const handleUrlImport = async (overrideUrl?: string) => {
     const url = overrideUrl ?? downloadUrl.trim()
     if (!url) return
@@ -327,12 +404,24 @@ export default function ImportPage() {
           )}
 
           {nswMode === 'weekly' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Week ending (Monday)</label>
-              <input type="date" value={nswWeekDate} onChange={e => setNswWeekDate(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white" />
-              <p className="text-xs text-gray-400 mt-2">One week of sales data for NSW. Run multiple weeks to build up your database.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Week ending (Monday)</label>
+                <input type="date" value={nswWeekDate} onChange={e => setNswWeekDate(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 bg-white" />
+                <p className="text-xs text-gray-400 mt-2">One specific week. Or use <strong>Sync all 2026 weeks</strong> below to catch up automatically.</p>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-blue-800 mb-1">Sync all 2026 weeks at once</p>
+                <p className="text-xs text-blue-600 mb-3">Automatically fetches every Monday from Jan 2026 to 2 weeks ago. Already-imported weeks are skipped. Run this weekly to stay current.</p>
+                {(step === 'idle' || step === 'error' || step === 'done') && (
+                  <button onClick={handleSyncAll2026}
+                    className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                    Sync all 2026 weeks
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

@@ -33,13 +33,22 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ inserted: count ?? records.length })
 }
 
-// Get counts of sales and suburbs in DB
+// Get counts of sales and suburbs in DB, or list of imported weekly dates
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Return count of sales in DB
+  const type = request.nextUrl.searchParams.get('type')
+
+  if (type === 'weekly') {
+    const { data, error } = await supabase
+      .from('weekly_imports')
+      .select('week_date')
+    if (error) return NextResponse.json({ importedWeeks: [] })
+    return NextResponse.json({ importedWeeks: (data || []).map(r => r.week_date) })
+  }
+
   const { count } = await supabase
     .from('property_sales')
     .select('*', { count: 'exact', head: true })
