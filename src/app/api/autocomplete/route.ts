@@ -12,10 +12,23 @@ export async function GET(request: NextRequest) {
   const type = request.nextUrl.searchParams.get('type') ?? 'suburb'
   const suburb = request.nextUrl.searchParams.get('suburb')?.trim() ?? ''
 
+  // Return all suburbs for client-side filtering (preload)
+  if (type === 'suburb' && q === 'all') {
+    const limit = parseInt(request.nextUrl.searchParams.get('limit') || '5000')
+    const { data } = await supabase
+      .from('suburb_centroids')
+      .select('suburb, state')
+      .order('suburb')
+      .limit(limit)
+    const results = (data || []).map(r => ({ label: `${r.suburb}, ${r.state}`, suburb: r.suburb, state: r.state }))
+    return NextResponse.json({ results }, {
+      headers: { 'Cache-Control': 'public, max-age=3600' }
+    })
+  }
+
   if (q.length < 2) return NextResponse.json({ results: [] })
 
   if (type === 'suburb') {
-    // Search suburb_centroids for matching suburbs
     const { data } = await supabase
       .from('suburb_centroids')
       .select('suburb, state')

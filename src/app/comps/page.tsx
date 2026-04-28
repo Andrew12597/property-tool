@@ -172,7 +172,7 @@ export default function CompsPage() {
                   value={address}
                   onChange={setAddress}
                   onSelect={s => setAddress(s.label)}
-                  fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
+                  type="suburb"
                   placeholder="Parramatta NSW"
                   icon={<MapPin size={15} />}
                 />
@@ -208,7 +208,7 @@ export default function CompsPage() {
                 value={suburbOnly}
                 onChange={v => { setSuburbOnly(v); setSuburbOnlyState('NSW') }}
                 onSelect={s => { setSuburbOnly(s.suburb); setSuburbOnlyState(s.state) }}
-                fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
+                type="suburb"
                 placeholder="e.g. Parramatta"
                 icon={<MapPin size={15} />}
               />
@@ -231,7 +231,8 @@ export default function CompsPage() {
                 value={streetName}
                 onChange={setStreetName}
                 onSelect={s => setStreetName(s.street)}
-                fetchUrl={q => `/api/autocomplete?type=street&q=${encodeURIComponent(q)}&suburb=${encodeURIComponent(suburbFilter)}`}
+                type="street"
+                streetContext={suburbFilter}
                 placeholder="George Street"
                 icon={<Navigation size={15} />}
               />
@@ -242,7 +243,7 @@ export default function CompsPage() {
                 value={suburbFilter}
                 onChange={v => { setSuburbFilter(v); setSuburbState('NSW') }}
                 onSelect={s => { setSuburbFilter(s.suburb); setSuburbState(s.state) }}
-                fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
+                type="suburb"
                 placeholder="e.g. Sydney"
                 icon={<MapPin size={15} />}
               />
