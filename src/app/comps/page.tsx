@@ -1,8 +1,9 @@
 'use client'
 import { useState } from 'react'
-import { MapPin, Search, TrendingUp, DollarSign, Database, Navigation } from 'lucide-react'
+import { MapPin, Search, TrendingUp, DollarSign, Database, Navigation, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatCurrencyFull, formatNumber, cn } from '@/lib/utils'
 import Link from 'next/link'
+import AutocompleteInput from '@/components/AutocompleteInput'
 
 interface SoldProperty {
   id: number
@@ -17,6 +18,9 @@ interface SoldProperty {
   pricePerM2: number | null
 }
 
+type SortKey = 'sold_date' | 'price' | 'land_size' | 'pricePerM2'
+type SortDir = 'asc' | 'desc'
+
 const PROPERTY_TYPES = ['House', 'Land']
 
 export default function CompsPage() {
@@ -29,6 +33,7 @@ export default function CompsPage() {
   // Street mode
   const [streetName, setStreetName] = useState('')
   const [suburbFilter, setSuburbFilter] = useState('')
+  const [suburbState, setSuburbState] = useState('NSW')
 
   // Common filters
   const [minPrice, setMinPrice] = useState('')
@@ -38,7 +43,10 @@ export default function CompsPage() {
   const [soldAfterMonths, setSoldAfterMonths] = useState(24)
   const [propertyTypes, setPropertyTypes] = useState<string[]>([])
 
+  // Results + sorting
   const [results, setResults] = useState<SoldProperty[]>([])
+  const [sortKey, setSortKey] = useState<SortKey>('sold_date')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
@@ -46,6 +54,26 @@ export default function CompsPage() {
 
   const toggleType = (t: string) =>
     setPropertyTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown size={12} className="text-gray-300 ml-1 inline" />
+    return sortDir === 'desc'
+      ? <ArrowDown size={12} className="text-blue-500 ml-1 inline" />
+      : <ArrowUp size={12} className="text-blue-500 ml-1 inline" />
+  }
+
+  const sorted = [...results].sort((a, b) => {
+    const va = a[sortKey] ?? (sortDir === 'desc' ? -Infinity : Infinity)
+    const vb = b[sortKey] ?? (sortDir === 'desc' ? -Infinity : Infinity)
+    if (va < vb) return sortDir === 'asc' ? -1 : 1
+    if (va > vb) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
 
   const search = async () => {
     if (searchMode === 'radius' && !address.trim()) return
@@ -107,7 +135,7 @@ export default function CompsPage() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">Comps Finder</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Search sold properties from NSW/QLD government data</p>
+        <p className="text-sm text-gray-500 mt-0.5">Search 2.2M sold properties — NSW govt data 2015–2026</p>
       </div>
 
       {/* Search form */}
@@ -129,17 +157,18 @@ export default function CompsPage() {
           <div className="flex gap-3 mb-4">
             <div className="flex-1">
               <label className="block text-xs font-medium text-gray-600 mb-1">Suburb or address</label>
-              <div className="flex items-center border border-gray-200 rounded-lg focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
-                <MapPin size={15} className="ml-3 text-gray-400 shrink-0" />
-                <input type="text" value={address} onChange={e => setAddress(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && search()}
-                  placeholder="Parramatta NSW"
-                  className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none" />
-              </div>
+              <AutocompleteInput
+                value={address}
+                onChange={setAddress}
+                onSelect={s => { setAddress(s.label); }}
+                fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
+                placeholder="Parramatta NSW"
+                icon={<MapPin size={15} />}
+              />
             </div>
             <div className="w-28">
               <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
-              <div className="flex items-center border border-gray-200 rounded-lg">
+              <div className="flex items-center border border-gray-200 rounded-lg bg-white">
                 <input type="number" value={radiusKm} onChange={e => setRadiusKm(parseFloat(e.target.value) || 1)}
                   step={0.5} min={0.5} onFocus={e => e.target.select()}
                   className="flex-1 px-3 py-2.5 text-sm outline-none w-0" />
@@ -154,20 +183,31 @@ export default function CompsPage() {
           <div className="flex gap-3 mb-4">
             <div className="flex-1">
               <label className="block text-xs font-medium text-gray-600 mb-1">Street name</label>
-              <div className="flex items-center border border-gray-200 rounded-lg focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
-                <Navigation size={15} className="ml-3 text-gray-400 shrink-0" />
-                <input type="text" value={streetName} onChange={e => setStreetName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && search()}
-                  placeholder="George Street"
-                  className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none" />
-              </div>
+              <AutocompleteInput
+                value={streetName}
+                onChange={setStreetName}
+                onSelect={s => setStreetName(s.street)}
+                fetchUrl={q => `/api/autocomplete?type=street&q=${encodeURIComponent(q)}&suburb=${encodeURIComponent(suburbFilter)}`}
+                placeholder="George Street"
+                icon={<Navigation size={15} />}
+              />
             </div>
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb (optional)</label>
-              <input type="text" value={suburbFilter} onChange={e => setSuburbFilter(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && search()}
+              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb</label>
+              <AutocompleteInput
+                value={suburbFilter}
+                onChange={v => { setSuburbFilter(v); setSuburbState('NSW') }}
+                onSelect={s => { setSuburbFilter(s.suburb); setSuburbState(s.state) }}
+                fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
                 placeholder="e.g. Sydney"
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-400" />
+                icon={<MapPin size={15} />}
+              />
+            </div>
+            <div className="w-24">
+              <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+              <div className="flex items-center justify-center h-[42px] border border-gray-200 rounded-lg bg-gray-50 text-sm font-medium text-gray-500 px-3">
+                {suburbState || 'NSW'}
+              </div>
             </div>
           </div>
         )}
@@ -204,7 +244,7 @@ export default function CompsPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">Property type</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               {PROPERTY_TYPES.map(t => (
                 <button key={t} onClick={() => toggleType(t)}
                   className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
@@ -212,7 +252,7 @@ export default function CompsPage() {
                   {t}
                 </button>
               ))}
-              <span className="text-xs text-gray-400 self-center ml-1">Note: govt data doesn't split House/Unit/Duplex</span>
+              <span className="text-xs text-gray-400 ml-1">Govt data doesn't separate House/Unit/Duplex</span>
             </div>
           </div>
 
@@ -225,11 +265,11 @@ export default function CompsPage() {
         </div>
       </div>
 
-      {/* No suburb data banner */}
+      {/* No suburb data */}
       {noSuburbs && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
           <p className="font-semibold text-amber-800 text-sm mb-1">No suburb data near this address</p>
-          <p className="text-amber-700 text-sm">You need to import government property sales data first.</p>
+          <p className="text-amber-700 text-sm">Geocoding may still be in progress — try again in a few minutes, or search by Street Name instead.</p>
           <Link href="/admin/import" className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors">
             <Database size={14} /> Go to Import Data
           </Link>
@@ -258,27 +298,35 @@ export default function CompsPage() {
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Results</p>
-              <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-full">NSW/QLD Govt Data</span>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Results — click column headers to sort</p>
+              <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-full">NSW Govt Data</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Address</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sale Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Land m²</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">$/m²</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sold</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('price')}>
+                      Sale Price <SortIcon k="price" />
+                    </th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('land_size')}>
+                      Land m² <SortIcon k="land_size" />
+                    </th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('pricePerM2')}>
+                      $/m² <SortIcon k="pricePerM2" />
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-blue-600 select-none whitespace-nowrap" onClick={() => toggleSort('sold_date')}>
+                      Sold <SortIcon k="sold_date" />
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {results.sort((a, b) => b.sold_date.localeCompare(a.sold_date)).map((p, i) => (
+                  {sorted.map((p, i) => (
                     <tr key={p.id} className={cn('border-b border-gray-50', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50')}>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900 leading-snug">{p.address}</p>
-                        <p className="text-xs text-gray-400">{p.suburb}, {p.state}</p>
+                        <p className="text-xs text-gray-400">{p.suburb}, {p.state}{p.postcode ? ` ${p.postcode}` : ''}</p>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{formatCurrencyFull(p.price)}</td>
                       <td className="px-4 py-3 text-right text-gray-600 tabular-nums">{p.land_size ? formatNumber(p.land_size) : '—'}</td>
