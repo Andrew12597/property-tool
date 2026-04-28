@@ -4,6 +4,7 @@ import { MapPin, Search, TrendingUp, DollarSign, Database, Navigation, ArrowUpDo
 import { formatCurrencyFull, formatNumber, cn } from '@/lib/utils'
 import Link from 'next/link'
 import AutocompleteInput from '@/components/AutocompleteInput'
+import PriceTrendChart from '@/components/PriceTrendChart'
 
 interface SoldProperty {
   id: number
@@ -325,6 +326,7 @@ export default function CompsPage() {
 
       {results.length > 0 && (
         <>
+          <PriceTrendChart sales={results} />
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
               { label: 'Properties found', value: results.length.toString(), icon: MapPin },

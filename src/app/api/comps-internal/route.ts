@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       .ilike('address', `%${streetName.trim()}%`)
       .gte('sold_date', soldAfterStr)
       .order('sold_date', { ascending: false })
-      .limit(300)
+      .limit(2000)
 
     if (suburb?.trim()) query = query.ilike('suburb', `%${suburb.trim()}%`)
     if (minPrice) query = query.gte('price', minPrice)
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       .ilike('suburb', suburb.trim())
       .gte('sold_date', soldAfterStr)
       .order('sold_date', { ascending: false })
-      .limit(300)
+      .limit(2000)
 
     if (minPrice) query = query.gte('price', minPrice)
     if (maxPrice) query = query.lte('price', maxPrice)
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     .in('suburb', nearbySuburbs)
     .gte('sold_date', soldAfterStr)
     .order('sold_date', { ascending: false })
-    .limit(200)
+    .limit(2000)
 
   if (minPrice) query = query.gte('price', minPrice)
   if (maxPrice) query = query.lte('price', maxPrice)

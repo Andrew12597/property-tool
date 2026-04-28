@@ -7,16 +7,16 @@ interface Suggestion {
   [key: string]: string
 }
 
-// ── Client-side suburb cache (loaded once, reused across instances) ────────────
+// ── Client-side suburb cache — loads from static JSON (CDN-cached, instant) ──
 let suburbCache: Suggestion[] | null = null
 let suburbCachePromise: Promise<Suggestion[]> | null = null
 
 async function loadSuburbs(): Promise<Suggestion[]> {
   if (suburbCache) return suburbCache
   if (suburbCachePromise) return suburbCachePromise
-  suburbCachePromise = fetch('/api/autocomplete?type=suburb&q=all&limit=5000')
+  suburbCachePromise = fetch('/suburbs.json')
     .then(r => r.json())
-    .then(d => { suburbCache = d.results || []; return suburbCache! })
+    .then(d => { suburbCache = Array.isArray(d) ? d : (d.results || []); return suburbCache! })
     .catch(() => [])
   return suburbCachePromise
 }
