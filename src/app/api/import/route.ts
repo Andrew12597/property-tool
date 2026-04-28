@@ -49,13 +49,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ importedWeeks: (data || []).map(r => r.week_date) })
   }
 
-  const { count } = await supabase
-    .from('property_sales')
-    .select('*', { count: 'exact', head: true })
+  const [{ count }, { count: suburbCount }, { data: latestRow }, { data: weekRows }] = await Promise.all([
+    supabase.from('property_sales').select('*', { count: 'exact', head: true }),
+    supabase.from('suburb_centroids').select('*', { count: 'exact', head: true }),
+    supabase.from('property_sales').select('sold_date').order('sold_date', { ascending: false }).limit(1),
+    supabase.from('weekly_imports').select('week_date').order('week_date', { ascending: false }).limit(1),
+  ])
 
-  const { count: suburbCount } = await supabase
-    .from('suburb_centroids')
-    .select('*', { count: 'exact', head: true })
-
-  return NextResponse.json({ salesCount: count ?? 0, suburbCount: suburbCount ?? 0 })
+  return NextResponse.json({
+    salesCount: count ?? 0,
+    suburbCount: suburbCount ?? 0,
+    latestSaleDate: latestRow?.[0]?.sold_date ?? null,
+    latestWeekImported: weekRows?.[0]?.week_date ?? null,
+  })
 }
