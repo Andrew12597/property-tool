@@ -4,8 +4,7 @@ import { MapPin, Search, TrendingUp, DollarSign, Database, Navigation, ArrowUpDo
 import { formatCurrencyFull, formatNumber, cn } from '@/lib/utils'
 import Link from 'next/link'
 import AutocompleteInput from '@/components/AutocompleteInput'
-import dynamic from 'next/dynamic'
-const PriceTrendChart = dynamic(() => import('@/components/PriceTrendChart'), { ssr: false })
+import PriceTrendChart from '@/components/PriceTrendChart'
 
 interface SoldProperty {
   id: number
