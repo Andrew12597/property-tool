@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const {
-    mode = 'radius',          // 'radius' | 'street'
-    address, radiusKm = 1,
-    streetName, suburb,       // for street mode
+    mode = 'radius',          // 'radius' | 'suburb' | 'street'
+    address, radiusKm = 1, useRadius = true,
+    streetName, suburb,       // for street/suburb mode
     minPrice, maxPrice,
     minLandSize, maxLandSize, soldAfterMonths = 12, propertyTypes
   } = await request.json()
@@ -34,6 +34,29 @@ export async function POST(request: NextRequest) {
       .limit(300)
 
     if (suburb?.trim()) query = query.ilike('suburb', `%${suburb.trim()}%`)
+    if (minPrice) query = query.gte('price', minPrice)
+    if (maxPrice) query = query.lte('price', maxPrice)
+    if (minLandSize) query = query.gte('land_size', minLandSize)
+    if (maxLandSize) query = query.lte('land_size', maxLandSize)
+    if (propertyTypes?.length) query = query.in('property_type', propertyTypes)
+
+    const { data: sales, error } = await query
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ results: sales || [] })
+  }
+
+  // ── Suburb-only mode ─────────────────────────────────────────────────────
+  if (mode === 'suburb') {
+    if (!suburb?.trim()) return NextResponse.json({ error: 'Enter a suburb to search.' }, { status: 400 })
+
+    let query = supabase
+      .from('property_sales')
+      .select('*')
+      .ilike('suburb', suburb.trim())
+      .gte('sold_date', soldAfterStr)
+      .order('sold_date', { ascending: false })
+      .limit(300)
+
     if (minPrice) query = query.gte('price', minPrice)
     if (maxPrice) query = query.lte('price', maxPrice)
     if (minLandSize) query = query.gte('land_size', minLandSize)

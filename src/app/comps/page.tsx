@@ -24,11 +24,16 @@ type SortDir = 'asc' | 'desc'
 const PROPERTY_TYPES = ['House', 'Land']
 
 export default function CompsPage() {
-  const [searchMode, setSearchMode] = useState<'radius' | 'street'>('radius')
+  const [searchMode, setSearchMode] = useState<'address' | 'suburb' | 'street'>('address')
 
-  // Radius mode
+  // Address mode
   const [address, setAddress] = useState('')
+  const [useRadius, setUseRadius] = useState(true)
   const [radiusKm, setRadiusKm] = useState(1)
+
+  // Suburb mode
+  const [suburbOnly, setSuburbOnly] = useState('')
+  const [suburbOnlyState, setSuburbOnlyState] = useState('NSW')
 
   // Street mode
   const [streetName, setStreetName] = useState('')
@@ -76,7 +81,8 @@ export default function CompsPage() {
   })
 
   const search = async () => {
-    if (searchMode === 'radius' && !address.trim()) return
+    if (searchMode === 'address' && !address.trim()) return
+    if (searchMode === 'suburb' && !suburbOnly.trim()) return
     if (searchMode === 'street' && !streetName.trim()) return
 
     setLoading(true)
@@ -95,9 +101,13 @@ export default function CompsPage() {
         propertyTypes: propertyTypes.length ? propertyTypes : undefined,
       }
 
-      if (searchMode === 'radius') {
+      if (searchMode === 'address') {
         body.address = address
-        body.radiusKm = radiusKm
+        body.radiusKm = useRadius ? radiusKm : 0.01
+        body.mode = useRadius ? 'radius' : 'suburb'
+        body.suburb = address
+      } else if (searchMode === 'suburb') {
+        body.suburb = suburbOnly
       } else {
         body.streetName = streetName
         body.suburb = suburbFilter
@@ -143,7 +153,7 @@ export default function CompsPage() {
 
         {/* Mode toggle */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-4">
-          {([['radius', MapPin, 'Suburb / Radius'], ['street', Navigation, 'Street Name']] as const).map(([id, Icon, label]) => (
+          {([['address', MapPin, 'Address'], ['suburb', Database, 'Suburb'], ['street', Navigation, 'Street']] as const).map(([id, Icon, label]) => (
             <button key={id} onClick={() => setSearchMode(id)}
               className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all',
                 searchMode === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
@@ -152,27 +162,61 @@ export default function CompsPage() {
           ))}
         </div>
 
-        {/* Radius mode inputs */}
-        {searchMode === 'radius' && (
+        {/* Address mode */}
+        {searchMode === 'address' && (
+          <div className="space-y-3 mb-4">
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Address or suburb</label>
+                <AutocompleteInput
+                  value={address}
+                  onChange={setAddress}
+                  onSelect={s => setAddress(s.label)}
+                  fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
+                  placeholder="Parramatta NSW"
+                  icon={<MapPin size={15} />}
+                />
+              </div>
+              {useRadius && (
+                <div className="w-28">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
+                  <div className="flex items-center border border-gray-200 rounded-lg bg-white">
+                    <input type="number" value={radiusKm} onChange={e => setRadiusKm(parseFloat(e.target.value) || 1)}
+                      step={0.5} min={0.5} onFocus={e => e.target.select()}
+                      className="flex-1 px-3 py-2.5 text-sm outline-none w-0" />
+                    <span className="pr-3 text-gray-400 text-sm">km</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer w-fit">
+              <div onClick={() => setUseRadius(v => !v)}
+                className={cn('w-9 h-5 rounded-full transition-colors relative', useRadius ? 'bg-blue-500' : 'bg-gray-300')}>
+                <div className={cn('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all', useRadius ? 'left-4' : 'left-0.5')} />
+              </div>
+              <span className="text-xs text-gray-600">Search within radius</span>
+            </label>
+          </div>
+        )}
+
+        {/* Suburb-only mode */}
+        {searchMode === 'suburb' && (
           <div className="flex gap-3 mb-4">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb or address</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Suburb</label>
               <AutocompleteInput
-                value={address}
-                onChange={setAddress}
-                onSelect={s => { setAddress(s.label); }}
+                value={suburbOnly}
+                onChange={v => { setSuburbOnly(v); setSuburbOnlyState('NSW') }}
+                onSelect={s => { setSuburbOnly(s.suburb); setSuburbOnlyState(s.state) }}
                 fetchUrl={q => `/api/autocomplete?type=suburb&q=${encodeURIComponent(q)}`}
-                placeholder="Parramatta NSW"
+                placeholder="e.g. Parramatta"
                 icon={<MapPin size={15} />}
               />
             </div>
-            <div className="w-28">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Radius</label>
-              <div className="flex items-center border border-gray-200 rounded-lg bg-white">
-                <input type="number" value={radiusKm} onChange={e => setRadiusKm(parseFloat(e.target.value) || 1)}
-                  step={0.5} min={0.5} onFocus={e => e.target.select()}
-                  className="flex-1 px-3 py-2.5 text-sm outline-none w-0" />
-                <span className="pr-3 text-gray-400 text-sm">km</span>
+            <div className="w-24">
+              <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+              <div className="flex items-center justify-center h-[42px] border border-gray-200 rounded-lg bg-gray-50 text-sm font-medium text-gray-500 px-3">
+                {suburbOnlyState || 'NSW'}
               </div>
             </div>
           </div>
@@ -257,7 +301,7 @@ export default function CompsPage() {
           </div>
 
           <button onClick={search}
-            disabled={loading || (searchMode === 'radius' ? !address.trim() : !streetName.trim())}
+            disabled={loading || (searchMode === 'address' ? !address.trim() : searchMode === 'suburb' ? !suburbOnly.trim() : !streetName.trim())}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0">
             <Search size={15} />
             {loading ? 'Searching…' : 'Find Comps'}
