@@ -130,15 +130,15 @@ export default function GrowthPage() {
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 space-y-3">
         {/* Period */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Compare period</p>
-          <div className="flex gap-2 flex-wrap">
+          <div className="grid grid-cols-4 gap-1.5">
             {(['3m','6m','1y','2y'] as Period[]).map(p => (
               <button key={p} onClick={() => setPeriod(p)}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+                  'py-2 rounded-lg text-sm font-medium border transition-colors text-center',
                   period === p
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-700'
@@ -147,55 +147,54 @@ export default function GrowthPage() {
               </button>
             ))}
           </div>
-          {/* Date range hint */}
-          <p className="text-xs text-gray-400 mt-2">
-            Recent: {periodDates.recentStart} → {periodDates.recentEnd} &nbsp;·&nbsp;
-            Prior:  {periodDates.priorStart} → {periodDates.priorEnd}
+          <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+            Recent: {periodDates.recentStart} → {periodDates.recentEnd}<br className="sm:hidden" />
+            <span className="hidden sm:inline"> · </span>Prior: {periodDates.priorStart} → {periodDates.priorEnd}
           </p>
         </div>
 
-        {/* Property type + min sales */}
-        <div className="flex flex-wrap gap-4 items-end">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Property type</p>
-            <div className="flex gap-1">
-              {(['all','House','Land'] as PropType[]).map(t => (
-                <button key={t} onClick={() => setPropType(t)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
-                    propType === t
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-                  )}>
-                  {t === 'all' ? 'All' : t}
-                </button>
-              ))}
-            </div>
+        {/* Property type */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Property type</p>
+          <div className="flex gap-1.5">
+            {(['all','House','Land'] as PropType[]).map(t => (
+              <button key={t} onClick={() => setPropType(t)}
+                className={cn(
+                  'flex-1 py-2 rounded-lg text-sm font-medium border transition-colors',
+                  propType === t
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                )}>
+                {t === 'all' ? 'All types' : t}
+              </button>
+            ))}
           </div>
-
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Min sales per period</p>
-            <div className="flex gap-1">
-              {[3, 5, 10, 20].map(n => (
-                <button key={n} onClick={() => setMinSales(n)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
-                    minSales === n
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-                  )}>
-                  {n}+
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={() => run(period, propType, minSales)} disabled={loading}
-            className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm h-9">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            {loading ? 'Loading…' : 'Run'}
-          </button>
         </div>
+
+        {/* Min sales */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Min sales per period</p>
+          <div className="flex gap-1.5">
+            {[3, 5, 10, 20].map(n => (
+              <button key={n} onClick={() => setMinSales(n)}
+                className={cn(
+                  'flex-1 py-2 rounded-lg text-sm font-medium border transition-colors',
+                  minSales === n
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                )}>
+                {n}+
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Run */}
+        <button onClick={() => run(period, propType, minSales)} disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm">
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          {loading ? 'Loading…' : 'Run'}
+        </button>
       </div>
 
       {/* ── Error ───────────────────────────────────────────────────────── */}
@@ -210,10 +209,10 @@ export default function GrowthPage() {
         <>
           {/* Hero top 3 */}
           {topThree.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            <div className="flex gap-3 mb-5 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
               {topThree.map((r, i) => (
                 <div key={r.suburb} className={cn(
-                  'bg-white border rounded-xl p-4',
+                  'bg-white border rounded-xl p-4 shrink-0 w-52 sm:w-auto',
                   i === 0 ? 'border-emerald-300 shadow-sm' : 'border-gray-200'
                 )}>
                   {i === 0 && (
@@ -221,9 +220,7 @@ export default function GrowthPage() {
                   )}
                   <p className="font-bold text-gray-900 text-sm">{r.suburb}</p>
                   <p className="text-2xl font-bold text-emerald-600 mt-1">+{r.growth_pct.toFixed(1)}%</p>
-                  <div className="flex justify-between text-xs text-gray-400 mt-2">
-                    <span>{formatCurrencyFull(r.prior_median)} → {formatCurrencyFull(r.recent_median)}</span>
-                  </div>
+                  <p className="text-xs text-gray-400 mt-2">{formatCurrencyFull(r.prior_median)} → {formatCurrencyFull(r.recent_median)}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{r.recent_count} sales</p>
                 </div>
               ))}
